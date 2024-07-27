@@ -3,11 +3,14 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"net/http"
 	"os"
+
+	pokedexapi "github.com/kwekkwekpatu/gokedex/internal/pokedexAPI"
 )
 
 var cliName string = "gokedex"
+var nextURL string = "https://pokeapi.co/api/v2/location-area"
+var previousURL any
 
 type cliCommand struct {
 	name        string
@@ -81,6 +84,8 @@ func commandHelp() error {
 	fmt.Println("Usage:")
 	fmt.Println("  help: Displays a help message")
 	fmt.Println("  exit: Exit the Gokedex")
+	fmt.Println("  map: Print the next 20 locations")
+	fmt.Println("  mapb: Print the previous 20 locations")
 	return nil
 }
 
@@ -91,10 +96,39 @@ func commandExit() error {
 }
 
 func displayNext() error {
-	response, err := http.Get("")
+	locations, err := pokedexapi.GetLocation(nextURL)
+	if err != nil {
+		return err
+	}
+
+	display(locations)
 	return nil
 }
 
 func displayPrevious() error {
+	if previousURL == nil {
+		fmt.Println("You are already at the first locations")
+		return fmt.Errorf("No previousURL")
+	}
+	url, ok := previousURL.(string)
+	if !ok {
+		return fmt.Errorf("previousURL not a string")
+	}
+	locations, err := pokedexapi.GetLocation(string(url))
+	if err != nil {
+		return err
+	}
+
+	display(locations)
+	return nil
+}
+
+func display(locations pokedexapi.LocationResponse) error {
+	nextURL = locations.Next
+	previousURL = locations.Previous
+	for _, location := range locations.Results {
+		locationName := location.Name
+		fmt.Println(locationName)
+	}
 	return nil
 }
