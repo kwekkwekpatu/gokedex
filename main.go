@@ -15,6 +15,8 @@ import (
 var cliName string = "gokedex"
 var nextURL string = "https://pokeapi.co/api/v2/location-area"
 var previousURL any
+var commandHistory []string
+var historyIndex int = -1
 
 type Pokedex struct {
 	pokedex map[string]pokedexapi.Pokemon
@@ -305,4 +307,25 @@ func showPokedex(cache *pokecache.Cache, dex *Pokedex, args ...string) error {
 		fmt.Println(" - " + pokemon.Name)
 	}
 	return nil
+}
+
+func addCommand(command string) {
+	commandHistory = append(commandHistory, command)
+}
+
+func handleKeyPress(key string, currentCommand *string) {
+	if key == "up" {
+		if historyIndex < len(commandHistory)-1 {
+			historyIndex++
+			*currentCommand = commandHistory[len(commandHistory)-1-historyIndex]
+		}
+	} else if key == "down" {
+		if historyIndex > 0 {
+			historyIndex--
+			*currentCommand = commandHistory[len(commandHistory)-1-historyIndex]
+		} else {
+			historyIndex = -1
+			*currentCommand = ""
+		}
+	}
 }
