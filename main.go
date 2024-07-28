@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -260,11 +259,11 @@ func tryCatchPokemon(pokemon pokedexapi.Pokemon) bool {
 }
 
 func inspect(cache *pokecache.Cache, dex *Pokedex, args ...string) error {
-	name := args[0]
-	if name == "" {
+	if len(args) == 0 || args[0] == "" {
 		fmt.Println("No pokemon selected for inspection")
 		return nil
 	}
+	name := args[0]
 	pokemon, exists := dex.GetPokemon(name)
 	if !exists {
 		fmt.Println("you have not caught that pokemon")
@@ -274,19 +273,15 @@ func inspect(cache *pokecache.Cache, dex *Pokedex, args ...string) error {
 	return nil
 }
 
-func printPokemon(pokemon pokedexapi.Pokemon) error {
-	fmt.Println("Name: " + pokemon.Name)
-	fmt.Println("Height: " + strconv.Itoa(pokemon.Height))
-	fmt.Println("Weight: " + strconv.Itoa(pokemon.Weight))
-	fmt.Println("Stats:")
-	stats := pokemon.Stats
-	for _, stat := range stats {
-		fmt.Println(" -" + stat.Stat.Name + ": " + strconv.Itoa(stat.BaseStat))
+func printPokemon(pokemon pokedexapi.Pokemon) {
+	fmt.Printf("Name: %s\nHeight: %d\nWeight: %d\nStats:\n", pokemon.Name, pokemon.Height, pokemon.Weight)
+
+	for _, stat := range pokemon.Stats {
+		fmt.Printf(" -%s: %d\n", stat.Stat.Name, stat.BaseStat)
 	}
+
 	fmt.Println("Types:")
-	pokemonTypes := pokemon.Types
-	for _, pokemonType := range pokemonTypes {
-		fmt.Println(" - " + pokemonType.Type.Name)
+	for _, pokeType := range pokemon.Types {
+		fmt.Printf(" - %s\n", pokeType.Type.Name)
 	}
-	return nil
 }
