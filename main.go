@@ -76,6 +76,11 @@ func getCommands() map[string]cliCommand {
 			description: "Show the data of the selected pokemon if it's in the pokedex",
 			callback:    inspect,
 		},
+		"pokedex": {
+			name:        "pokedex",
+			description: "Shows all the pokemon in your pokedex",
+			callback:    showPokedex,
+		},
 	}
 }
 
@@ -131,6 +136,7 @@ func commandHelp(cache *pokecache.Cache, dex *Pokedex, args ...string) error {
 	fmt.Println("  explore [location]: Shows the pokemon that can be found in the given location")
 	fmt.Println("  catch [pokemon]: Attempts to catch the given pokemon")
 	fmt.Println("  inspect [pokemon]: Shows the information of the selected pokemon if the pokemon has been added to the pokedex")
+	fmt.Println("  pokedex: Show all the pokemon currently in your pokedex")
 	return nil
 }
 
@@ -240,6 +246,7 @@ func catch(cache *pokecache.Cache, dex *Pokedex, args ...string) error {
 	if tryCatchPokemon(pokemonData) {
 		dex.AddPokemon(pokemonData)
 		fmt.Println(pokemonName + " was caught!")
+		fmt.Println("You may now inspect it with the inspect command.")
 	} else {
 		fmt.Println(pokemonName + " escaped!")
 	}
@@ -266,7 +273,8 @@ func inspect(cache *pokecache.Cache, dex *Pokedex, args ...string) error {
 	name := args[0]
 	pokemon, exists := dex.GetPokemon(name)
 	if !exists {
-		fmt.Println("you have not caught that pokemon")
+		fmt.Println("you have not caught that pokemon.")
+		fmt.Println("Try catching it with the catch command.")
 		return nil
 	}
 	printPokemon(pokemon)
@@ -284,4 +292,17 @@ func printPokemon(pokemon pokedexapi.Pokemon) {
 	for _, pokeType := range pokemon.Types {
 		fmt.Printf(" - %s\n", pokeType.Type.Name)
 	}
+}
+
+func showPokedex(cache *pokecache.Cache, dex *Pokedex, args ...string) error {
+	if len(dex.pokedex) == 0 {
+		fmt.Println("Your pokedex is empty.")
+		fmt.Println("Try catching some pokemon first!")
+		return nil
+	}
+	fmt.Println("Your pokedex:")
+	for _, pokemon := range dex.pokedex {
+		fmt.Println(" - " + pokemon.Name)
+	}
+	return nil
 }
