@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -71,6 +72,11 @@ func getCommands() map[string]cliCommand {
 			description: "Try to catch the selected pokemon",
 			callback:    catch,
 		},
+		"inspect": {
+			name:        "inspect",
+			description: "Show the data of the selected pokemon if it's in the pokedex",
+			callback:    inspect,
+		},
 	}
 }
 
@@ -125,6 +131,7 @@ func commandHelp(cache *pokecache.Cache, dex *Pokedex, args ...string) error {
 	fmt.Println("  mapb: Print the previous 20 locations")
 	fmt.Println("  explore [location]: Shows the pokemon that can be found in the given location")
 	fmt.Println("  catch [pokemon]: Attempts to catch the given pokemon")
+	fmt.Println("  inspect [pokemon]: Shows the information of the selected pokemon if the pokemon has been added to the pokedex")
 	return nil
 }
 
@@ -250,4 +257,36 @@ func tryCatchPokemon(pokemon pokedexapi.Pokemon) bool {
 		return true
 	}
 	return false
+}
+
+func inspect(cache *pokecache.Cache, dex *Pokedex, args ...string) error {
+	name := args[0]
+	if name == "" {
+		fmt.Println("No pokemon selected for inspection")
+		return nil
+	}
+	pokemon, exists := dex.GetPokemon(name)
+	if !exists {
+		fmt.Println("you have not caught that pokemon")
+		return nil
+	}
+	printPokemon(pokemon)
+	return nil
+}
+
+func printPokemon(pokemon pokedexapi.Pokemon) error {
+	fmt.Println("Name: " + pokemon.Name)
+	fmt.Println("Height: " + strconv.Itoa(pokemon.Height))
+	fmt.Println("Weight: " + strconv.Itoa(pokemon.Weight))
+	fmt.Println("Stats:")
+	stats := pokemon.Stats
+	for _, stat := range stats {
+		fmt.Println(" -" + stat.Stat.Name + ": " + strconv.Itoa(stat.BaseStat))
+	}
+	fmt.Println("Types:")
+	pokemonTypes := pokemon.Types
+	for _, pokemonType := range pokemonTypes {
+		fmt.Println(" - " + pokemonType.Type.Name)
+	}
+	return nil
 }
