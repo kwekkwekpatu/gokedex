@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"math/rand"
 	"os"
 	"strings"
 	"time"
@@ -15,10 +16,27 @@ var cliName string = "gokedex"
 var nextURL string = "https://pokeapi.co/api/v2/location-area"
 var previousURL any
 
+type Pokedex struct {
+	pokedex map[string]pokedexapi.Pokemon
+}
+
+func NewPokedex() *Pokedex {
+	return &Pokedex{pokedex: make(map[string]pokedexapi.Pokemon)}
+}
+
+func (p *Pokedex) AddPokemon(pokemon pokedexapi.Pokemon) {
+	p.pokedex[pokemon.Name] = pokemon
+}
+
+func (p *Pokedex) GetPokemon(name string) (pokedexapi.Pokemon, bool) {
+	pokemon, exists := p.pokedex[name]
+	return pokemon, exists
+}
+
 type cliCommand struct {
 	name        string
 	description string
-	callback    func(cache *pokecache.Cache, args ...string) error
+	callback    func(cache *pokecache.Cache, dex *Pokedex, args ...string) error
 }
 
 func getCommands() map[string]cliCommand {
@@ -48,12 +66,18 @@ func getCommands() map[string]cliCommand {
 			description: "Explore the given location",
 			callback:    exploreLocation,
 		},
+		"catch": {
+			name:        "catch",
+			description: "Try to catch the selected pokemon",
+			callback:    catch,
+		},
 	}
 }
 
 func main() {
 	commands := getCommands()
 
+	dex := NewPokedex()
 	cache := pokecache.NewCache(5 * time.Second)
 	scanner := bufio.NewScanner(os.Stdin)
 
@@ -68,7 +92,7 @@ func main() {
 
 		command, exists := commands[commandName]
 		if exists {
-			err := command.callback(cache, args...)
+			err := command.callback(cache, dex, args...)
 			if err != nil {
 				fmt.Println("Error executing command: ", err)
 			}
@@ -92,7 +116,7 @@ func bootGokedex() error {
 	return nil
 }
 
-func commandHelp(cache *pokecache.Cache, args ...string) error {
+func commandHelp(cache *pokecache.Cache, dex *Pokedex, args ...string) error {
 	fmt.Println("Welcome to the Gokedex!")
 	fmt.Println("Usage:")
 	fmt.Println("  help: Displays a help message")
@@ -100,21 +124,22 @@ func commandHelp(cache *pokecache.Cache, args ...string) error {
 	fmt.Println("  map: Print the next 20 locations")
 	fmt.Println("  mapb: Print the previous 20 locations")
 	fmt.Println("  explore [location]: Shows the pokemon that can be found in the given location")
+	fmt.Println("  catch [pokemon]: Attempts to catch the given pokemon")
 	return nil
 }
 
-func commandExit(cache *pokecache.Cache, args ...string) error {
+func commandExit(ccache *pokecache.Cache, dex *Pokedex, args ...string) error {
 	fmt.Println("Closing the Gokedex!")
 	os.Exit(0)
 	return nil
 }
 
-func displayNext(cache *pokecache.Cache, args ...string) error {
+func displayNext(cache *pokecache.Cache, dex *Pokedex, args ...string) error {
 	body, err := fetch(nextURL, cache)
 	if err != nil {
 		return err
 	}
-	locations, err := pokedexapi.UnmarshelLocations(body)
+	locations, err := pokedexapi.UnmarshalLocations(body)
 	if err != nil {
 		return err
 	}
@@ -124,7 +149,7 @@ func displayNext(cache *pokecache.Cache, args ...string) error {
 	return nil
 }
 
-func displayPrevious(cache *pokecache.Cache, args ...string) error {
+func displayPrevious(cache *pokecache.Cache, dex *Pokedex, args ...string) error {
 	if previousURL == nil {
 		fmt.Println("You are already at the first locations")
 		return fmt.Errorf("No previousURL")
@@ -137,7 +162,7 @@ func displayPrevious(cache *pokecache.Cache, args ...string) error {
 	if err != nil {
 		return err
 	}
-	locations, err := pokedexapi.UnmarshelLocations(body)
+	locations, err := pokedexapi.UnmarshalLocations(body)
 	if err != nil {
 		return err
 	}
@@ -156,19 +181,19 @@ func display(locations pokedexapi.LocationsResponse) error {
 	return nil
 }
 
-func exploreLocation(cache *pokecache.Cache, args ...string) error {
+func exploreLocation(cache *pokecache.Cache, dex *Pokedex, args ...string) error {
 	baseURL := "https://pokeapi.co/api/v2/location-area/"
 	location := args[0]
 	fmt.Println("Exploring " + location + "...")
 	if location == "" {
 		return fmt.Errorf("Invalid location name")
 	}
-	url := baseURL + "/" + location
+	url := baseURL + location
 	body, err := fetch(url, cache)
 	if err != nil {
 		return err
 	}
-	locationData, err := pokedexapi.UnmarshelLocation(body)
+	locationData, err := pokedexapi.UnmarshalLocation(body)
 	if err != nil {
 		return err
 	}
@@ -187,4 +212,42 @@ func fetch(url string, cache *pokecache.Cache) ([]byte, error) {
 		return body, nil
 	}
 	return pokedexapi.Get(url)
+}
+
+func catch(cache *pokecache.Cache, dex *Pokedex, args ...string) error {
+	baseUrl := "https://pokeapi.co/api/v2/pokemon/"
+	nameOrId := args[0]
+	if nameOrId == "" {
+		return fmt.Errorf("No pokemon name or id given.")
+	}
+	url := baseUrl + nameOrId
+	body, err := fetch(url, cache)
+	if err != nil {
+		return err
+	}
+	pokemonData, err := pokedexapi.UnmarshalPokemon(body)
+	if err != nil {
+		return err
+	}
+	pokemonName := pokemonData.Name
+	fmt.Println("Throwing a pokeball at " + pokemonName + "...")
+	if tryCatchPokemon(pokemonData) {
+		dex.AddPokemon(pokemonData)
+		fmt.Println(pokemonName + " was caught!")
+	} else {
+		fmt.Println(pokemonName + " escaped!")
+	}
+	return nil
+}
+
+func tryCatchPokemon(pokemon pokedexapi.Pokemon) bool {
+	baseExp := pokemon.BaseExperience
+	randSource := rand.NewSource(time.Now().UnixNano())
+	randGen := rand.New(randSource)
+
+	threshold := randGen.Intn(100)
+	if threshold < 150-baseExp {
+		return true
+	}
+	return false
 }

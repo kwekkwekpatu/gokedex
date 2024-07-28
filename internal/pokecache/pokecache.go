@@ -1,6 +1,10 @@
 package pokecache
 
 import (
+	"bytes"
+	"compress/gzip"
+	"fmt"
+	"io"
 	"sync"
 	"time"
 )
@@ -27,6 +31,11 @@ func (c *Cache) Add(key string, val []byte) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	createdAt := time.Now()
+	val, err := compress(val)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 	newEntry := cacheEntry{
 		createdAt: createdAt,
 		val:       val,
@@ -42,7 +51,12 @@ func (c *Cache) Get(key string) ([]byte, bool) {
 	if !exists {
 		return nil, false
 	}
-	return entry.val, true
+	value, err := decompress(entry.val)
+	if err != nil {
+		fmt.Println(err)
+		return nil, false
+	}
+	return value, true
 }
 
 func (c *Cache) reapLoop(interval time.Duration) {
@@ -57,4 +71,27 @@ func (c *Cache) reapLoop(interval time.Duration) {
 		}
 		c.mu.Unlock()
 	}
+}
+
+// Compress the data
+func compress(data []byte) ([]byte, error) {
+	var buf bytes.Buffer
+	gz := gzip.NewWriter(&buf)
+	if _, err := gz.Write(data); err != nil {
+		return nil, err
+	}
+	if err := gz.Close(); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+// Decompress the data
+func decompress(data []byte) ([]byte, error) {
+	r, err := gzip.NewReader(bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+	defer r.Close()
+	return io.ReadAll(r)
 }
